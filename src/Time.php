@@ -8,6 +8,8 @@
 
 namespace ItvisionSy\Time;
 
+use ErrorException;
+
 /**
  * Class Time
  *
@@ -18,10 +20,15 @@ namespace ItvisionSy\Time;
  * @property integer minutes
  * @property integer seconds
  * @property integer millis
- * @method Time|integer hours($set=null)
- * @method Time|integer minutes($set=null)
- * @method Time|integer seconds($set=null)
- * @method Time|integer millis($set=null)
+ * @property integer timestamp
+ * @property float inHours
+ * @property float inMinutes
+ * @property float inSeconds
+ * @property float inMillis
+ * @method Time|integer hours(integer|string $set = null)
+ * @method Time|integer minutes(integer|string $set = null)
+ * @method Time|integer seconds(integer|string $set = null)
+ * @method Time|integer millis(integer|string $set = null)
  */
 class Time
 {
@@ -59,7 +66,7 @@ class Time
             $this->seconds($time);
         } elseif (is_float($time)) {
             $this->seconds((int)$time);
-            $this->millis((int) explode(".", "{$time}")[1]);
+            $this->millis(@(int)explode(".", "{$time}")[1] ?: 0);
         }
     }
 
@@ -69,7 +76,7 @@ class Time
      */
     public static function makeFromString($timeString)
     {
-        return new static($timeString);
+        return (new static())->parseString($timeString);
     }
 
     /**
@@ -82,19 +89,27 @@ class Time
     }
 
     /**
+     * @param string|integer $time
+     * @return Time
+     */
+    public static function make($time = null)
+    {
+        return new static($time);
+    }
+
+    /**
      * @param $timeString
      * @return Time|$this
      */
     public function parseString($timeString)
     {
-        $result = preg_match("#^(\d+)\:(\d{1,2})\:(\d{1,2})\.(\d+)$#", $timeString, $matches);
-        if (!$result) {
-            return;
+        $result = preg_match("#^(\d+)(\:(\d+)(\:(\d+)(\.(\d+))?)?)?$#", $timeString, $matches);
+        if ($result) {
+            $this->hours($matches[1]);
+            $this->minutes(@$matches[3] ?: "0");
+            $this->seconds(@$matches[5] ?: "0");
+            $this->millis(substr(@$matches[7] ?: "0", 0, 3));
         }
-        $this->hours($matches[1]);
-        $this->minutes($matches[2]);
-        $this->seconds($matches[3]);
-        $this->millis($matches[4]);
         return $this;
     }
 
@@ -107,9 +122,19 @@ class Time
             case 'millis':
                 return $this->get($name);
                 break;
+            case 'inHours':
+            case 'inMinutes':
+            case 'inSeconds':
+            case 'inMillis':
+                return $this->represent(substr(strtolower($name), 2));
+                break;
+            case 'timestamp':
+                return $this->time;
+                break;
             default:
                 trigger_error("Property not defined: {$name}");
         }
+        return null;
     }
 
     function __set($name, $value)
@@ -122,8 +147,9 @@ class Time
                 return $this->set($name, $value);
                 break;
             default:
-                trigger_error("Property not defined: {$name}");
+                throw new ErrorException("Property not defined: {$name}");
         }
+        return $this;
     }
 
 
@@ -137,8 +163,9 @@ class Time
                 return count($args) == 1 ? $this->set($name, $args[0]) : $this->get($name);
                 break;
             default:
-                trigger_error("Method not defined: {$name}");
+                throw new ErrorException("Method not defined: {$name}");
         }
+        return null;
     }
 
     /**
@@ -147,10 +174,7 @@ class Time
      */
     public function get($unit)
     {
-        $unitKey = array_search($unit, static::$units);
-        if ($unitKey === false) {
-            trigger_error("Unit not defined: {$unit}");
-        }
+        $unitKey = $this->getUnitKey($unit);
         $unitMultiplier = static::$multipliers[$unitKey];
         $unitReminder = $unitKey == 0 ? 0 : static::$multipliers[$unitKey - 1];
         $value = floor(($unitReminder ? $this->time % $unitReminder : $this->time) / $unitMultiplier);
@@ -164,10 +188,7 @@ class Time
      */
     public function set($unit, $value)
     {
-        $unitKey = array_search($unit, static::$units);
-        if ($unitKey === false) {
-            trigger_error("Unit not defined: {$unit}");
-        }
+        $unitKey = $this->getUnitKey($unit);
         $oldValue = $this->get($unit);
         $unitMultiplier = static::$multipliers[$unitKey];
         $newValue = gettype($value) === 'string' ? $this->parseStringValue($value, $oldValue) : (int)$value;
@@ -200,7 +221,7 @@ class Time
         $hours = $this->hours;
         $minutes = $leadingZeros ? str_pad($this->minutes, 2, "0", STR_PAD_LEFT) : $this->minutes;
         $seconds = $leadingZeros ? str_pad($this->seconds, 2, "0", STR_PAD_LEFT) : $this->seconds;
-        $millis = $this->millis;
+        $millis = $leadingZeros ? str_pad($this->millis, 3, "0", STR_PAD_LEFT) : $this->millis;
         return $sign . str_replace("-", "", "{$hours}:{$minutes}:{$seconds}.{$millis}");
     }
 
@@ -216,6 +237,100 @@ class Time
     public function tick($unit = "seconds")
     {
         return $this->set($unit, "+1");
+    }
+
+    /**
+     * Creates a new instance with the current time value
+     * @return Time
+     */
+    public function copy()
+    {
+        return new static($this->format());
+    }
+
+    /**
+     * @return int
+     */
+    public function timestamp()
+    {
+        return $this->time;
+    }
+
+    /**
+     * @param Time $compareTo
+     * @return Time
+     */
+    public function diff(Time $compareTo)
+    {
+        return new static(($this->timestamp() - $compareTo->timestamp) / 1000);
+    }
+
+    /**
+     * @param string $unit
+     * @return float|int
+     */
+    public function represent($unit)
+    {
+        $unitKey = $this->getUnitKey($unit);
+        $unitMultiplier = static::$multipliers[$unitKey];
+        return round($this->time / $unitMultiplier, 3);
+    }
+
+    /**
+     * @return bool
+     */
+    public function isMinus()
+    {
+        return $this->hours < 0;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isZero()
+    {
+        return $this->timestamp === 0;
+    }
+
+    /**
+     * @param Time $compareTo
+     * @return bool
+     */
+    public function isBefore(Time $compareTo)
+    {
+        return $this->diff($compareTo)->isMinus();
+    }
+
+    /**
+     * @param Time $compareTo
+     * @return bool
+     */
+    public function isAfter(Time $compareTo)
+    {
+        return !$this->diff($compareTo)->isZero() && !$this->isBefore($compareTo);
+    }
+
+    /**
+     * @param Time $compareTo
+     * @return bool
+     */
+    public function isEqual(Time $compareTo)
+    {
+        return $this->timestamp === $compareTo->timestamp;
+    }
+
+    /**
+     * @param $unit
+     * @return mixed
+     * @throws ErrorException
+     */
+    protected function getUnitKey($unit)
+    {
+        $unitKey = array_search($unit, static::$units);
+        if ($unitKey === false) {
+            throw new ErrorException("Unit not defined: {$unit}");
+        }
+        return $unitKey;
     }
 
 }

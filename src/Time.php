@@ -333,4 +333,22 @@ class Time
         return $unitKey;
     }
 
+    /**
+     * @param Time $time
+     * @return int|Time
+     */
+    public function add(Time $time)
+    {
+        return $this->millis('+' . $time->timestamp);
+    }
+
+    /**
+     * @param Time $time
+     * @return int|Time
+     */
+    public function sub(Time $time)
+    {
+        return $this->millis('-' . $time->timestamp);
+    }
+
 }

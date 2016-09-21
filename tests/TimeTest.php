@@ -9,7 +9,8 @@ use PHPUnit_Framework_TestCase;
 class TimeTest extends PHPUnit_Framework_TestCase
 {
 
-    public function testAttributes(){
+    public function testAttributes()
+    {
         $time = Time::make('1:30:30.500');
         $this->assertEquals(1.508, $time->inHours);
         $this->assertEquals(90.508, $time->inMinutes);
@@ -79,10 +80,44 @@ class TimeTest extends PHPUnit_Framework_TestCase
         Time::make()->micros = 50;
     }
 
+    /**
+     * @expectedException ErrorException
+     */
+    public function testWrongGet(){
+        Time::make()->get('micros');
+    }
+
+    /**
+     * @expectedException ErrorException
+     */
+    public function testWrongSet(){
+        Time::make()->set('micros', 10);
+    }
+
+    /**
+     * @expectedException ErrorException
+     */
+    public function testWrongAssign(){
+        Time::make()->micros = 10;
+    }
+
+    /**
+     * @expectedException ErrorException
+     */
+    public function testWrongMethod(){
+        Time::make()->micros();
+    }
+
     public function testCopy()
     {
         $time = Time::make('2');
         $this->assertTrue($time->isBefore($time->copy()->tick()));
+    }
+
+    public function testAddSub()
+    {
+        $this->assertEquals(10, Time::make('5:30')->add(Time::make('4:30'))->inHours);
+        $this->assertEquals(5.5, Time::make('10')->sub(Time::make('4:30'))->inHours);
     }
 
 }

@@ -215,7 +215,7 @@ class Time
      * @param bool $leadingZeros
      * @return string
      */
-    public function format($leadingZeros = false)
+    public function toTimeString($leadingZeros = false)
     {
         $sign = $this->hours < 0 ? "-" : "";
         $hours = $this->hours;
@@ -223,6 +223,49 @@ class Time
         $seconds = $leadingZeros ? str_pad($this->seconds, 2, "0", STR_PAD_LEFT) : $this->seconds;
         $millis = $leadingZeros ? str_pad($this->millis, 3, "0", STR_PAD_LEFT) : $this->millis;
         return $sign . str_replace("-", "", "{$hours}:{$minutes}:{$seconds}.{$millis}");
+    }
+
+    /**
+     * @param string $format c=micro, C=leading zeros micro, h=hours, H=leading zero hours, m=minutes, M=leading zero minutes
+     * @return string
+     */
+    public function format($format = "h:m:s.c")
+    {
+        if ($format === true) {
+            $format = "H:M:S.C";
+        }
+        $result = preg_replace_callback("#(\\\\)?([HhMmSsCc])#", function ($matches) {
+            if ($matches[1] === "\\") {
+                return $matches[0];
+            }
+            switch ($matches[2]) {
+                case 'S':
+                    return str_pad($this->seconds, 2, '0', STR_PAD_LEFT);
+                    break;
+                case 's':
+                    return $this->seconds;
+                    break;
+                case 'M':
+                    return str_pad($this->minutes, 2, '0', STR_PAD_LEFT);
+                    break;
+                case 'm':
+                    return $this->millis;
+                    break;
+                case 'H':
+                    return str_pad($this->hours, 2, '0', STR_PAD_LEFT);
+                    break;
+                case 'h':
+                    return $this->hours;
+                    break;
+                case 'C':
+                    return str_pad($this->millis, 3, '0', STR_PAD_LEFT);
+                    break;
+                case 'c':
+                    return $this->millis;
+                    break;
+            }
+        }, $format);
+        return $result;
     }
 
     function __toString()
@@ -331,24 +374,6 @@ class Time
             throw new ErrorException("Unit not defined: {$unit}");
         }
         return $unitKey;
-    }
-
-    /**
-     * @param Time $time
-     * @return int|Time
-     */
-    public function add(Time $time)
-    {
-        return $this->millis('+' . $time->timestamp);
-    }
-
-    /**
-     * @param Time $time
-     * @return int|Time
-     */
-    public function sub(Time $time)
-    {
-        return $this->millis('-' . $time->timestamp);
     }
 
 }

@@ -33,6 +33,11 @@ use ErrorException;
 class Time
 {
 
+    protected static $config = [
+        'full_format' => "H:M:S.C",
+        'format' => "h:m:s.c",
+    ];
+
     const UNIT_HOURS = 0;
     const UNIT_MINUTES = 1;
     const UNIT_SECONDS = 2;
@@ -226,13 +231,15 @@ class Time
     }
 
     /**
-     * @param string $format c=micro, C=leading zeros micro, h=hours, H=leading zero hours, m=minutes, M=leading zero minutes
+     * @param string $format c=milli, C=leading milli, h=hours, H=leading hours, m=minutes, M=leading minutes, s=seconds, S=leading seconds
      * @return string
      */
-    public function format($format = "h:m:s.c")
+    public function format($format = null)
     {
         if ($format === true) {
-            $format = "H:M:S.C";
+            $format = static::$config['full_format'];//"H:M:S.C";
+        } elseif ($format === null) {
+            $format = static::$config['format'];//"h:m:s.c"
         }
         $result = preg_replace_callback("#(\\\\)?([HhMmSsCc])#", function ($matches) {
             if ($matches[1] === "\\") {
@@ -374,6 +381,25 @@ class Time
             throw new ErrorException("Unit not defined: {$unit}");
         }
         return $unitKey;
+    }
+
+    /**
+     * @param $format
+     * @param bool $full
+     */
+    public static function setDefaultFormat($format, $full = false)
+    {
+        static::$config[($full ? "full_" : "") . "format"] = $format;
+    }
+
+    public function add(Time $time)
+    {
+        return $this->millis('+' . $time->timestamp);
+    }
+
+    public function sub(Time $time)
+    {
+        return $this->millis('-' . $time->timestamp);
     }
 
 }

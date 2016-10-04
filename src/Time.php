@@ -249,7 +249,7 @@ class Time
                     return str_pad($this->minutes, 2, '0', STR_PAD_LEFT);
                     break;
                 case 'm':
-                    return $this->millis;
+                    return $this->minutes;
                     break;
                 case 'H':
                     return str_pad($this->hours, 2, '0', STR_PAD_LEFT);
